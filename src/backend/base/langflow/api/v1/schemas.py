@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serial
 from langflow.graph.schema import RunOutputs
 from langflow.schema import dotdict
 from langflow.schema.graph import Tweaks
-from langflow.schema.schema import InputType, OutputType
+from langflow.schema.schema import InputType, OutputLog, OutputType
 from langflow.services.database.models.api_key.model import ApiKeyRead
 from langflow.services.database.models.base import orjson_dumps
 from langflow.services.database.models.flow import FlowCreate, FlowRead
@@ -182,6 +182,11 @@ class CustomComponentRequest(BaseModel):
     frontend_node: Optional[dict] = None
 
 
+class CustomComponentResponse(BaseModel):
+    data: dict
+    type: str
+
+
 class UpdateCustomComponentRequest(CustomComponentRequest):
     field: str
     field_value: Optional[Union[str, int, float, bool, dict, list]] = None
@@ -245,6 +250,8 @@ class VerticesOrderResponse(BaseModel):
 
 class ResultDataResponse(BaseModel):
     results: Optional[Any] = Field(default_factory=dict)
+    outputs: dict[str, OutputLog] = Field(default_factory=dict)
+    message: Optional[Any] = Field(default_factory=dict)
     artifacts: Optional[Any] = Field(default_factory=dict)
     timedelta: Optional[float] = None
     duration: Optional[str] = None
@@ -296,7 +303,7 @@ class InputValueRequest(BaseModel):
 
 
 class SimplifiedAPIRequest(BaseModel):
-    input_value: Optional[str] = Field(default="", description="The input value")
+    input_value: Optional[str] = Field(default=None, description="The input value")
     input_type: Optional[InputType] = Field(default="chat", description="The input type")
     output_type: Optional[OutputType] = Field(default="chat", description="The output type")
     output_component: Optional[str] = Field(

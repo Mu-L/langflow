@@ -1,19 +1,11 @@
-import { useLocation, useNavigate } from "react-router-dom";
 /// <reference types="vite-plugin-svgr/client" />
-//@ts-ignore
-import { ReactComponent as TransferFiles } from "../../../../assets/undraw_transfer_files_re_a2a9.svg";
-//@ts-ignore
-//@ts-ignore
-//@ts-ignore
-import { ReactComponent as APIRequest } from "../../../../assets/undraw_real_time_analytics_re_yliv.svg";
-//@ts-ignore
-import { ReactComponent as PromptChaining } from "../../../../assets/undraw_cloud_docs_re_xjht.svg";
-//@ts-ignore
-import { ReactComponent as ChatBot } from "../../../../assets/undraw_chat_bot_re_e2gj.svg";
-//@ts-ignore
-import { ReactComponent as BlogPost } from "../../../../assets/undraw_blog_post_re_fy5x.svg";
-//@ts-ignore
-import { ReactComponent as BasicPrompt } from "../../../../assets/undraw_short_bio_re_fmx0.svg";
+import { useLocation, useNavigate } from "react-router-dom";
+import BlogPost from "../../../../assets/undraw_blog_post_re_fy5x.svg?react";
+import ChatBot from "../../../../assets/undraw_chat_bot_re_e2gj.svg?react";
+import PromptChaining from "../../../../assets/undraw_cloud_docs_re_xjht.svg?react";
+import APIRequest from "../../../../assets/undraw_real_time_analytics_re_yliv.svg?react";
+import BasicPrompt from "../../../../assets/undraw_short_bio_re_fmx0.svg?react";
+import TransferFiles from "../../../../assets/undraw_transfer_files_re_a2a9.svg?react";
 
 import {
   Card,
@@ -34,6 +26,9 @@ export default function UndrawCardComponent({
   const location = useLocation();
   const folderId = location?.state?.folderId;
   const setFolderUrl = useFolderStore((state) => state.setFolderUrl);
+  const myCollectionId = useFolderStore((state) => state.myCollectionId);
+
+  const folderIdUrl = folderId || myCollectionId || "";
 
   function selectImage() {
     switch (flow.name) {
@@ -43,8 +38,8 @@ export default function UndrawCardComponent({
             style={{
               width: "65%",
               height: "65%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       case "Basic Prompting (Hello, World)":
@@ -53,8 +48,8 @@ export default function UndrawCardComponent({
             style={{
               width: "65%",
               height: "65%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       case "Memory Chatbot":
@@ -63,8 +58,8 @@ export default function UndrawCardComponent({
             style={{
               width: "70%",
               height: "70%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       case "API requests":
@@ -73,8 +68,8 @@ export default function UndrawCardComponent({
             style={{
               width: "70%",
               height: "70%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       case "Document QA":
@@ -83,8 +78,8 @@ export default function UndrawCardComponent({
             style={{
               width: "80%",
               height: "80%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       case "Vector Store RAG":
@@ -93,8 +88,8 @@ export default function UndrawCardComponent({
             style={{
               width: "80%",
               height: "80%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
       default:
@@ -103,8 +98,8 @@ export default function UndrawCardComponent({
             style={{
               width: "80%",
               height: "80%",
-              preserveAspectRatio: "xMidYMid meet",
             }}
+            preserveAspectRatio="xMidYMid meet"
           />
         );
     }
@@ -116,7 +111,7 @@ export default function UndrawCardComponent({
         updateIds(flow.data!);
         addFlow(true, flow).then((id) => {
           setFolderUrl(folderId ?? "");
-          navigate(`/flow/${id}${folderId ? `/folder/${folderId}` : ""}`);
+          navigate(`/flow/${id}/folder/${folderIdUrl}`);
         });
       }}
       className="h-64 w-80 cursor-pointer bg-background pt-4"

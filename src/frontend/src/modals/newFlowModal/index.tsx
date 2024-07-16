@@ -10,12 +10,6 @@ export default function NewFlowModal({
 }: newFlowModalPropsType): JSX.Element {
   const examples = useFlowsManagerStore((state) => state.examples);
 
-  examples?.forEach((example) => {
-    if (example.name === "Blog Writter") {
-      example.name = "Blog Writer";
-    }
-  });
-
   return (
     <BaseModal size="three-cards" open={open} setOpen={setOpen}>
       <BaseModal.Header description={"Select a template below"}>
@@ -24,7 +18,7 @@ export default function NewFlowModal({
         </span>
       </BaseModal.Header>
       <BaseModal.Content>
-        <div className=" mb-5 grid h-fit w-full grid-cols-3 gap-4 overflow-auto pb-6 custom-scroll">
+        <div className="mb-5 grid h-fit w-full grid-cols-3 gap-4 overflow-auto pb-6 custom-scroll">
           <NewFlowCardComponent />
 
           {examples.find((e) => e.name == "Basic Prompting (Hello, World)") && (

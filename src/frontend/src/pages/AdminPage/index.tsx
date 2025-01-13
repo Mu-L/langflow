@@ -1,10 +1,15 @@
+import PaginatorComponent from "@/components/common/paginatorComponent";
+import {
+  useAddUser,
+  useDeleteUsers,
+  useGetUsers,
+  useUpdateUser,
+} from "@/controllers/API/queries/auth";
 import { cloneDeep } from "lodash";
 import { useContext, useEffect, useRef, useState } from "react";
-import PaginatorComponent from "../../components/PaginatorComponent";
-import ShadTooltip from "../../components/ShadTooltipComponent";
-import IconComponent from "../../components/genericIconComponent";
-import Header from "../../components/headerComponent";
-import LoadingComponent from "../../components/loadingComponent";
+import IconComponent from "../../components/common/genericIconComponent";
+import LoadingComponent from "../../components/common/loadingComponent";
+import ShadTooltip from "../../components/common/shadTooltipComponent";
 import { Button } from "../../components/ui/button";
 import { CheckBoxDiv } from "../../components/ui/checkbox";
 import { Input } from "../../components/ui/input";
@@ -17,41 +22,40 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import {
+  USER_ADD_ERROR_ALERT,
+  USER_ADD_SUCCESS_ALERT,
+  USER_DEL_ERROR_ALERT,
+  USER_DEL_SUCCESS_ALERT,
+  USER_EDIT_ERROR_ALERT,
+  USER_EDIT_SUCCESS_ALERT,
+} from "../../constants/alerts_constants";
+import {
   ADMIN_HEADER_DESCRIPTION,
   ADMIN_HEADER_TITLE,
+  PAGINATION_PAGE,
+  PAGINATION_ROWS_COUNT,
+  PAGINATION_SIZE,
 } from "../../constants/constants";
 import { AuthContext } from "../../contexts/authContext";
-import {
-  addUser,
-  deleteUser,
-  getUsersPage,
-  updateUser,
-} from "../../controllers/API";
-import ConfirmationModal from "../../modals/ConfirmationModal";
-import UserManagementModal from "../../modals/UserManagementModal";
+import ConfirmationModal from "../../modals/confirmationModal";
+import UserManagementModal from "../../modals/userManagementModal";
 import useAlertStore from "../../stores/alertStore";
-import useFlowsManagerStore from "../../stores/flowsManagerStore";
 import { Users } from "../../types/api";
 import { UserInputType } from "../../types/components";
 
 export default function AdminPage() {
   const [inputValue, setInputValue] = useState("");
 
-  const [size, setPageSize] = useState(10);
-  const [index, setPageIndex] = useState(1);
-  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [size, setPageSize] = useState(PAGINATION_SIZE);
+  const [index, setPageIndex] = useState(PAGINATION_PAGE);
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const { userData } = useContext(AuthContext);
   const [totalRowsCount, setTotalRowsCount] = useState(0);
-  const setCurrentFlowId = useFlowsManagerStore(
-    (state) => state.setCurrentFlowId
-  );
 
-  // set null id
-  useEffect(() => {
-    setCurrentFlowId("");
-  }, []);
+  const { mutate: mutateDeleteUser } = useDeleteUsers();
+  const { mutate: mutateUpdateUser } = useUpdateUser();
+  const { mutate: mutateAddUser } = useAddUser();
 
   const userList = useRef([]);
 
@@ -63,39 +67,47 @@ export default function AdminPage() {
 
   const [filterUserList, setFilterUserList] = useState(userList.current);
 
+  const { mutate: mutateGetUsers, isPending, isIdle } = useGetUsers({});
+
   function getUsers() {
-    setLoadingUsers(true);
-    getUsersPage(index - 1, size)
-      .then((users) => {
-        setTotalRowsCount(users["total_count"]);
-        userList.current = users["users"];
-        setFilterUserList(users["users"]);
-        setLoadingUsers(false);
-      })
-      .catch((error) => {
-        setLoadingUsers(false);
-      });
+    mutateGetUsers(
+      {
+        skip: size * (index - 1),
+        limit: size,
+      },
+      {
+        onSuccess: (users) => {
+          setTotalRowsCount(users["total_count"]);
+          userList.current = users["users"];
+          setFilterUserList(users["users"]);
+        },
+        onError: () => {},
+      },
+    );
   }
 
   function handleChangePagination(pageIndex: number, pageSize: number) {
-    setLoadingUsers(true);
     setPageSize(pageSize);
     setPageIndex(pageIndex);
-    getUsersPage(pageSize * (pageIndex - 1), pageSize)
-      .then((users) => {
-        setTotalRowsCount(users["total_count"]);
-        userList.current = users["users"];
-        setFilterUserList(users["users"]);
-        setLoadingUsers(false);
-      })
-      .catch((error) => {
-        setLoadingUsers(false);
-      });
+
+    mutateGetUsers(
+      {
+        skip: pageSize * (pageIndex - 1),
+        limit: pageSize,
+      },
+      {
+        onSuccess: (users) => {
+          setTotalRowsCount(users["total_count"]);
+          userList.current = users["users"];
+          setFilterUserList(users["users"]);
+        },
+      },
+    );
   }
 
   function resetFilter() {
-    setPageIndex(1);
-    setPageSize(10);
+    setPageIndex(PAGINATION_PAGE);
+    setPageSize(PAGINATION_SIZE);
     getUsers();
   }
 
@@ -106,105 +118,136 @@ export default function AdminPage() {
       setFilterUserList(userList.current);
     } else {
       const filteredList = userList.current.filter((user: Users) =>
-        user.username.toLowerCase().includes(input.toLowerCase())
+        user.username.toLowerCase().includes(input.toLowerCase()),
       );
       setFilterUserList(filteredList);
     }
   }
 
   function handleDeleteUser(user) {
-    deleteUser(user.id)
-      .then((res) => {
-        resetFilter();
-        setSuccessData({
-          title: "Success! User deleted!",
-        });
-      })
-      .catch((error) => {
-        setErrorData({
-          title: "Error on delete user",
-          list: [error["response"]["data"]["detail"]],
-        });
-      });
+    mutateDeleteUser(
+      { user_id: user.id },
+      {
+        onSuccess: () => {
+          resetFilter();
+          setSuccessData({
+            title: USER_DEL_SUCCESS_ALERT,
+          });
+        },
+        onError: (error) => {
+          setErrorData({
+            title: USER_DEL_ERROR_ALERT,
+            list: [error["response"]["data"]["detail"]],
+          });
+        },
+      },
+    );
   }
 
   function handleEditUser(userId, user) {
-    updateUser(userId, user)
-      .then((res) => {
-        resetFilter();
-        setSuccessData({
-          title: "Success! User edited!",
-        });
-      })
-      .catch((error) => {
-        setErrorData({
-          title: "Error on edit user",
-          list: [error["response"]["data"]["detail"]],
-        });
-      });
+    mutateUpdateUser(
+      { user_id: userId, user: user },
+      {
+        onSuccess: () => {
+          resetFilter();
+          setSuccessData({
+            title: USER_EDIT_SUCCESS_ALERT,
+          });
+        },
+        onError: (error) => {
+          setErrorData({
+            title: USER_EDIT_ERROR_ALERT,
+            list: [error["response"]["data"]["detail"]],
+          });
+        },
+      },
+    );
   }
 
   function handleDisableUser(check, userId, user) {
     const userEdit = cloneDeep(user);
     userEdit.is_active = !check;
 
-    updateUser(userId, userEdit)
-      .then((res) => {
-        resetFilter();
-        setSuccessData({
-          title: "Success! User edited!",
-        });
-      })
-      .catch((error) => {
-        setErrorData({
-          title: "Error on edit user",
-          list: [error["response"]["data"]["detail"]],
-        });
-      });
+    mutateUpdateUser(
+      { user_id: userId, user: userEdit },
+      {
+        onSuccess: () => {
+          resetFilter();
+          setSuccessData({
+            title: USER_EDIT_SUCCESS_ALERT,
+          });
+        },
+        onError: (error) => {
+          setErrorData({
+            title: USER_EDIT_ERROR_ALERT,
+            list: [error["response"]["data"]["detail"]],
+          });
+        },
+      },
+    );
   }
 
   function handleSuperUserEdit(check, userId, user) {
     const userEdit = cloneDeep(user);
     userEdit.is_superuser = !check;
-    updateUser(userId, userEdit)
-      .then((res) => {
-        resetFilter();
-        setSuccessData({
-          title: "Success! User edited!",
-        });
-      })
-      .catch((error) => {
-        setErrorData({
-          title: "Error on edit user",
-          list: [error["response"]["data"]["detail"]],
-        });
-      });
+
+    mutateUpdateUser(
+      { user_id: userId, user: userEdit },
+      {
+        onSuccess: () => {
+          resetFilter();
+          setSuccessData({
+            title: USER_EDIT_SUCCESS_ALERT,
+          });
+        },
+        onError: (error) => {
+          setErrorData({
+            title: USER_EDIT_ERROR_ALERT,
+            list: [error["response"]["data"]["detail"]],
+          });
+        },
+      },
+    );
   }
 
   function handleNewUser(user: UserInputType) {
-    addUser(user)
-      .then((res) => {
-        updateUser(res["id"], {
-          is_active: user.is_active,
-          is_superuser: user.is_superuser,
-        }).then((res) => {
-          resetFilter();
-          setSuccessData({
-            title: "Success! New user added!",
-          });
-        });
-      })
-      .catch((error) => {
+    mutateAddUser(user, {
+      onSuccess: (res) => {
+        mutateUpdateUser(
+          {
+            user_id: res["id"],
+            user: {
+              is_active: user.is_active,
+              is_superuser: user.is_superuser,
+            },
+          },
+          {
+            onSuccess: () => {
+              resetFilter();
+              setSuccessData({
+                title: USER_ADD_SUCCESS_ALERT,
+              });
+            },
+            onError: (error) => {
+              setErrorData({
+                title: USER_ADD_ERROR_ALERT,
+                list: [error["response"]["data"]["detail"]],
+              });
+            },
+          },
+        );
+      },
+      onError: (error) => {
         setErrorData({
-          title: "Error when adding new user",
-          list: [error.response.data.detail],
+          title: USER_ADD_ERROR_ALERT,
+          list: [error["response"]["data"]["detail"]],
         });
-      });
+      },
+    });
   }
 
   return (
     <>
-      <Header />
       {userData && (
         <div className="admin-page-panel flex h-full flex-col pb-8">
           <div className="main-page-nav-arrangement">
@@ -258,11 +301,11 @@ export default function AdminPage() {
               </UserManagementModal>
             </div>
           </div>
-          {loadingUsers ? (
+          {isPending || isIdle ? (
             <div className="flex h-full w-full items-center justify-center">
               <LoadingComponent remSize={12} />
             </div>
-          ) : userList.current.length === 0 ? (
+          ) : userList.current.length === 0 && !isIdle ? (
             <>
               <div className="m-4 flex items-center justify-between text-sm">
                 No users registered.
@@ -272,14 +315,14 @@ export default function AdminPage() {
             <>
               <div
                 className={
-                  "m-4 h-full overflow-x-hidden overflow-y-scroll rounded-md border-2 bg-background custom-scroll" +
-                  (loadingUsers ? " border-0" : "")
+                  "m-4 h-fit overflow-x-hidden overflow-y-scroll rounded-md border-2 bg-background custom-scroll" +
+                  (isPending ? " border-0" : "")
                 }
               >
-                <Table className={"table-fixed outline-1 "}>
+                <Table className={"table-fixed outline-1"}>
                   <TableHeader
                     className={
-                      loadingUsers ? "hidden" : "table-fixed bg-muted outline-1"
+                      isPending ? "hidden" : "table-fixed bg-muted outline-1"
                     }
                   >
                     <TableRow>
@@ -289,10 +332,10 @@ export default function AdminPage() {
                       <TableHead className="h-10">Superuser</TableHead>
                       <TableHead className="h-10">Created At</TableHead>
                       <TableHead className="h-10">Updated At</TableHead>
-                      <TableHead className="h-10 w-[100px]  text-right"></TableHead>
+                      <TableHead className="h-10 w-[100px] text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
-                  {!loadingUsers && (
+                  {!isPending && (
                     <TableBody>
                       {filterUserList.map((user: UserInputType, index) => (
                         <TableRow key={index}>
@@ -323,7 +366,7 @@ export default function AdminPage() {
                                 handleDisableUser(
                                   user.is_active,
                                   user.id,
-                                  user
+                                  user,
                                 );
                               }}
                             >
@@ -355,7 +398,7 @@ export default function AdminPage() {
                                 handleSuperUserEdit(
                                   user.is_superuser,
                                   user.id,
-                                  user
+                                  user,
                                 );
                               }}
                             >
@@ -372,7 +415,7 @@ export default function AdminPage() {
                               </ConfirmationModal.Trigger>
                             </ConfirmationModal>
                           </TableCell>
-                          <TableCell className="truncate py-2 ">
+                          <TableCell className="truncate py-2">
                             {
                               new Date(user.create_at!)
                                 .toISOString()
@@ -448,9 +491,8 @@ export default function AdminPage() {
                 pageIndex={index}
                 pageSize={size}
                 totalRowsCount={totalRowsCount}
-                paginate={(pageSize, pageIndex) => {
-                  handleChangePagination(pageIndex, pageSize);
-                }}
+                paginate={handleChangePagination}
+                rowsCount={PAGINATION_ROWS_COUNT}
               ></PaginatorComponent>
             </>
           )}

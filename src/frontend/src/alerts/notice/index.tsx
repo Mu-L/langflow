@@ -1,26 +1,37 @@
+import { CustomLink } from "@/customization/components/custom-link";
 import { Transition } from "@headlessui/react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import IconComponent from "../../components/genericIconComponent";
+import IconComponent from "../../components/common/genericIconComponent";
 import { NoticeAlertType } from "../../types/alerts";
 
 export default function NoticeAlert({
   title,
-  link = "",
+  link,
   id,
   removeAlert,
 }: NoticeAlertType): JSX.Element {
   const [show, setShow] = useState(true);
+
   useEffect(() => {
-    if (show) {
+    const timeoutId = setTimeout(() => {
+      setShow(false);
+      // Wait for the leave transition before calling removeAlert
       setTimeout(() => {
-        setShow(false);
-        setTimeout(() => {
-          removeAlert(id);
-        }, 500);
-      }, 5000);
-    }
-  }, [id, removeAlert, show]);
+        removeAlert(id);
+      }, 500); // match the duration of the leave transition
+    }, 5000); // auto-dismiss alert after 5 seconds
+
+    return () => clearTimeout(timeoutId); // Cleanup timeout on component unmount or re-render
+  }, [id, removeAlert]);
+
+  const handleClick = () => {
+    setShow(false);
+    // Wait for the leave transition before calling removeAlert
+    setTimeout(() => {
+      removeAlert(id);
+    }, 500); // Ensure the alert is removed after the animation
+  };
+
   return (
     <Transition
       show={show}
@@ -32,17 +43,14 @@ export default function NoticeAlert({
       leaveTo={"transform translate-x-[-100%]"}
     >
       <div
-        onClick={() => {
-          setShow(false);
-          removeAlert(id);
-        }}
-        className="nocopy nopan nodelete nodrag noundo mt-6 w-96 rounded-md bg-info-background p-4 shadow-xl"
+        onClick={handleClick}
+        className="noflow nowheel nopan nodelete nodrag mt-6 w-96 rounded-md bg-info-background p-4 shadow-xl"
       >
         <div className="flex">
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 cursor-help">
             <IconComponent
               name="Info"
-              className="h-5 w-5 text-status-blue "
+              className="h-5 w-5 text-status-blue"
               aria-hidden="true"
             />
           </div>
@@ -51,15 +59,13 @@ export default function NoticeAlert({
               {title}
             </p>
             <p className="mt-3 text-sm md:ml-6 md:mt-0">
-              {link !== "" ? (
-                <Link
+              {link && (
+                <CustomLink
                   to={link}
                   className="whitespace-nowrap font-medium text-info-foreground hover:text-accent-foreground"
                 >
                   Details
-                </Link>
-              ) : (
-                <></>
+                </CustomLink>
               )}
             </p>
           </div>

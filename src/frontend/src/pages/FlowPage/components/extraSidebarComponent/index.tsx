@@ -1,76 +1,99 @@
+import {
+  ENABLE_INTEGRATIONS,
+  ENABLE_MVPS,
+} from "@/customization/feature-flags";
+import { useStoreStore } from "@/stores/storeStore";
 import { cloneDeep } from "lodash";
-import { useEffect, useMemo, useState } from "react";
-import ShadTooltip from "../../../../components/ShadTooltipComponent";
-import IconComponent from "../../../../components/genericIconComponent";
+import { useEffect, useState } from "react";
+import IconComponent from "../../../../components/common/genericIconComponent";
 import { Input } from "../../../../components/ui/input";
 import { Separator } from "../../../../components/ui/separator";
-import ApiModal from "../../../../modals/ApiModal";
-import ExportModal from "../../../../modals/exportModal";
-import ShareModal from "../../../../modals/shareModal";
+import {
+  BUNDLES_SIDEBAR_FOLDER_NAMES,
+  PRIORITY_SIDEBAR_ORDER,
+} from "../../../../constants/constants";
 import useAlertStore from "../../../../stores/alertStore";
 import useFlowStore from "../../../../stores/flowStore";
-import useFlowsManagerStore from "../../../../stores/flowsManagerStore";
-import { useStoreStore } from "../../../../stores/storeStore";
 import { useTypesStore } from "../../../../stores/typesStore";
 import { APIClassType, APIObjectType } from "../../../../types/api";
-import {
-  nodeColors,
-  nodeIconsLucide,
-  nodeNames,
-} from "../../../../utils/styleUtils";
-import {
-  classNames,
-  removeCountFromString,
-  sensitiveSort,
-} from "../../../../utils/utils";
-import DisclosureComponent from "../DisclosureComponent";
-import SidebarDraggableComponent from "./sideBarDraggableComponent";
+import { nodeIconsLucide } from "../../../../utils/styleUtils";
+import ParentDisclosureComponent from "../ParentDisclosureComponent";
+import { SidebarCategoryComponent } from "./SidebarCategoryComponent";
+
+import { useUtilityStore } from "@/stores/utilityStore";
+import { SidebarFilterComponent } from "./sidebarFilterComponent";
+import { sortKeys } from "./utils";
 
 export default function ExtraSidebar(): JSX.Element {
   const data = useTypesStore((state) => state.data);
   const templates = useTypesStore((state) => state.templates);
   const getFilterEdge = useFlowStore((state) => state.getFilterEdge);
   const setFilterEdge = useFlowStore((state) => state.setFilterEdge);
-  const uploadFlow = useFlowsManagerStore((state) => state.uploadFlow);
-  const currentFlow = useFlowsManagerStore((state) => state.currentFlow);
   const hasStore = useStoreStore((state) => state.hasStore);
-  const hasApiKey = useStoreStore((state) => state.hasApiKey);
-  const validApiKey = useStoreStore((state) => state.validApiKey);
+  const filterType = useFlowStore((state) => state.filterType);
 
-  const isBuilt = useFlowStore((state) => state.isBuilt);
+  const featureFlags = useUtilityStore((state) => state.featureFlags);
+
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const [dataFilter, setFilterData] = useState(data);
   const [search, setSearch] = useState("");
   function onDragStart(
     event: React.DragEvent<any>,
-    data: { type: string; node?: APIClassType }
+    data: { type: string; node?: APIClassType },
   ): void {
     //start drag event
     var crt = event.currentTarget.cloneNode(true);
     crt.style.position = "absolute";
+    crt.style.width = "215px";
     crt.style.top = "-500px";
     crt.style.right = "-500px";
     crt.classList.add("cursor-grabbing");
     document.body.appendChild(crt);
     event.dataTransfer.setDragImage(crt, 0, 0);
-    event.dataTransfer.setData("nodedata", JSON.stringify(data));
+    event.dataTransfer.setData("genericNode", JSON.stringify(data));
+  }
+  function normalizeString(str: string): string {
+    return str.toLowerCase().replace(/_/g, " ").replace(/\s+/g, "");
   }
 
-  // Handle showing components after use search input
+  function searchInMetadata(metadata: any, searchTerm: string): boolean {
+    if (!metadata || typeof metadata !== "object") return false;
+
+    return Object.entries(metadata).some(([key, value]) => {
+      if (typeof value === "string") {
+        return (
+          normalizeString(key).includes(searchTerm) ||
+          normalizeString(value).includes(searchTerm)
+        );
+      }
+      if (typeof value === "object") {
+        return searchInMetadata(value, searchTerm);
+      }
+      return false;
+    });
+  }
+
   function handleSearchInput(e: string) {
     if (e === "") {
       setFilterData(data);
       return;
     }
+
+    const searchTerm = normalizeString(e);
+
     setFilterData((_) => {
-      let ret = {};
-      Object.keys(data).forEach((d: keyof APIObjectType, i) => {
+      let ret: APIObjectType = {};
+      Object.keys(data).forEach((d: keyof APIObjectType) => {
         ret[d] = {};
-        let keys = Object.keys(data[d]).filter(
-          (nd) =>
-            nd.toLowerCase().includes(e.toLowerCase()) ||
-            data[d][nd].display_name?.toLowerCase().includes(e.toLowerCase())
-        );
+        let keys = Object.keys(data[d]).filter((nd) => {
+          const item = data[d][nd];
+          return (
+            normalizeString(nd).includes(searchTerm) ||
+            normalizeString(item.display_name).includes(searchTerm) ||
+            normalizeString(d.toString()).includes(searchTerm) ||
+            (item.metadata && searchInMetadata(item.metadata, searchTerm))
+          );
+        });
         keys.forEach((element) => {
           ret[d][element] = data[d][element];
         });
@@ -136,44 +159,7 @@ export default function ExtraSidebar(): JSX.Element {
 
             if (filtered.some((x) => x !== "")) {
               let keys = Object.keys(dataClone[d]).filter((nd) =>
-                filtered.includes(nd)
-              );
-              Object.keys(dataClone[d]).forEach((element) => {
-                if (!keys.includes(element)) {
-                  delete ret[d][element];
-                }
-              });
-            }
-          }
-        });
-        setSearch("");
-        return ret;
-      });
-    }
-  }, [getFilterEdge]);
-
-  useEffect(() => {
-    if (getFilterEdge?.length > 0) {
-      setFilterData((_) => {
-        let dataClone = cloneDeep(data);
-        let ret = {};
-        Object.keys(dataClone).forEach((d: keyof APIObjectType, i) => {
-          ret[d] = {};
-          if (getFilterEdge.some((x) => x.family === d)) {
-            ret[d] = dataClone[d];
-
-            const filtered = getFilterEdge
-              .filter((x) => x.family === d)
-              .pop()
-              .type.split(",");
-
-            for (let i = 0; i < filtered.length; i++) {
-              filtered[i] = filtered[i].trimStart();
-            }
-
-            if (filtered.some((x) => x !== "")) {
-              let keys = Object.keys(dataClone[d]).filter((nd) =>
-                filtered.includes(nd)
+                filtered.includes(nd),
               );
               Object.keys(dataClone[d]).forEach((element) => {
                 if (!keys.includes(element)) {
@@ -189,116 +175,8 @@ export default function ExtraSidebar(): JSX.Element {
     }
   }, [getFilterEdge, data]);
 
-  const ModalMemo = useMemo(
-    () => (
-      <ShareModal
-        is_component={false}
-        component={currentFlow!}
-        disabled={!hasApiKey || !validApiKey || !hasStore}
-      >
-        <button
-          disabled={!hasApiKey || !validApiKey || !hasStore}
-          className={classNames(
-            "extra-side-bar-buttons gap-[4px] text-sm font-semibold",
-            !hasApiKey || !validApiKey || !hasStore
-              ? "button-disable  cursor-default text-muted-foreground"
-              : ""
-          )}
-        >
-          <IconComponent
-            name="Share3"
-            className={classNames(
-              "-m-0.5 -ml-1 h-6 w-6",
-              !hasApiKey || !validApiKey || !hasStore
-                ? "extra-side-bar-save-disable"
-                : ""
-            )}
-          />
-          Share
-        </button>
-      </ShareModal>
-    ),
-    [hasApiKey, validApiKey, currentFlow, hasStore]
-  );
-
-  const ExportMemo = useMemo(
-    () => (
-      <ExportModal>
-        <button className={classNames("extra-side-bar-buttons")}>
-          <IconComponent name="FileDown" className="side-bar-button-size" />
-        </button>
-      </ExportModal>
-    ),
-    []
-  );
-
   return (
     <div className="side-bar-arrangement">
-      <div className="side-bar-buttons-arrangement">
-        {hasStore && validApiKey && (
-          <ShadTooltip
-            content={
-              !hasApiKey || !validApiKey
-                ? "Please review your API key."
-                : "Share"
-            }
-            side="top"
-            styleClasses="cursor-default"
-          >
-            <div className="side-bar-button">{ModalMemo}</div>
-          </ShadTooltip>
-        )}
-        <div className="side-bar-button">
-          <ShadTooltip content="Import" side="top">
-            <button
-              className="extra-side-bar-buttons"
-              onClick={() => {
-                uploadFlow({ newProject: false, isComponent: false }).catch(
-                  (error) => {
-                    setErrorData({
-                      title: "Error uploading file",
-                      list: [error],
-                    });
-                  }
-                );
-              }}
-            >
-              <IconComponent name="FileUp" className="side-bar-button-size " />
-            </button>
-          </ShadTooltip>
-        </div>
-        {(!hasApiKey || !validApiKey) && (
-          <ShadTooltip
-            content="Export"
-            side="top"
-            styleClasses="cursor-default"
-          >
-            <div className="side-bar-button">{ExportMemo}</div>
-          </ShadTooltip>
-        )}
-        <ShadTooltip content={"Code"} side="top">
-          <div className="side-bar-button">
-            {currentFlow && currentFlow.data && (
-              <ApiModal flow={currentFlow}>
-                <button
-                  className={"w-full " + (!isBuilt ? "button-disable" : "")}
-                >
-                  <div className={classNames("extra-side-bar-buttons")}>
-                    <IconComponent
-                      name="Code2"
-                      className={
-                        "side-bar-button-size" +
-                        (isBuilt ? " " : " extra-side-bar-save-disable")
-                      }
-                    />
-                  </div>
-                </button>
-              </ApiModal>
-            )}
-          </div>
-        </ShadTooltip>
-      </div>
-      <Separator />
       <div className="side-bar-search-div-placement">
         <Input
           onFocusCapture={() => handleBlur()}
@@ -307,101 +185,161 @@ export default function ExtraSidebar(): JSX.Element {
           name="search"
           id="search"
           placeholder="Search"
-          className="nopan nodelete nodrag noundo nocopy input-search"
+          className="nopan nodelete nodrag noflow input-search"
           onChange={(event) => {
             handleSearchInput(event.target.value);
             // Set search input state
             setSearch(event.target.value);
           }}
+          readOnly
+          onClick={() =>
+            document?.getElementById("search")?.removeAttribute("readonly")
+          }
         />
-        <div className="search-icon">
+        <div
+          className="search-icon"
+          onClick={() => {
+            if (search) {
+              setFilterData(data);
+              setSearch("");
+            }
+          }}
+        >
           <IconComponent
-            name="Search"
-            className={"h-5 w-5 stroke-[1.5] text-primary"}
+            name={search ? "X" : "Search"}
+            className={`h-5 w-5 stroke-[1.5] text-primary ${
+              search ? "cursor-pointer" : "cursor-default"
+            }`}
             aria-hidden="true"
           />
         </div>
       </div>
+      <Separator />
 
       <div className="side-bar-components-div-arrangement">
+        <div className="parent-disclosure-arrangement">
+          <div className="flex w-full flex-col items-start justify-between gap-2.5">
+            <span className="text-sm font-medium">Components</span>
+            {filterType && (
+              <SidebarFilterComponent
+                isInput={!!filterType.source}
+                type={filterType.type}
+                resetFilters={() => {
+                  setFilterEdge([]);
+                  setFilterData(data);
+                }}
+              />
+            )}
+          </div>
+        </div>
+        <Separator />
         {Object.keys(dataFilter)
-          .sort((a, b) => {
-            if (a.toLowerCase() === "saved_components") {
-              return -1;
-            } else if (b.toLowerCase() === "saved_components") {
-              return 1;
-            } else if (a.toLowerCase() === "custom_components") {
-              return -2;
-            } else if (b.toLowerCase() === "custom_components") {
-              return 2;
-            } else {
-              return a.localeCompare(b);
-            }
-          })
+          .sort(sortKeys)
+          .filter((x) => PRIORITY_SIDEBAR_ORDER.includes(x))
           .map((SBSectionName: keyof APIObjectType, index) =>
             Object.keys(dataFilter[SBSectionName]).length > 0 ? (
-              <DisclosureComponent
-                openDisc={
-                  getFilterEdge.length !== 0 || search.length !== 0
-                    ? true
-                    : false
-                }
-                key={index + search + JSON.stringify(getFilterEdge)}
-                button={{
-                  title: nodeNames[SBSectionName] ?? nodeNames.unknown,
-                  Icon:
-                    nodeIconsLucide[SBSectionName] ?? nodeIconsLucide.unknown,
-                }}
-              >
-                <div className="side-bar-components-gap">
-                  {Object.keys(dataFilter[SBSectionName])
-                    .sort((a, b) =>
-                      sensitiveSort(
-                        dataFilter[SBSectionName][a].display_name,
-                        dataFilter[SBSectionName][b].display_name
-                      )
-                    )
-                    .map((SBItemName: string, index) => (
-                      <ShadTooltip
-                        content={
-                          dataFilter[SBSectionName][SBItemName].display_name
-                        }
-                        side="right"
-                        key={index}
-                      >
-                        <SidebarDraggableComponent
-                          sectionName={SBSectionName as string}
-                          apiClass={dataFilter[SBSectionName][SBItemName]}
-                          key={index}
-                          onDragStart={(event) =>
-                            onDragStart(event, {
-                              //split type to remove type in nodes saved with same name removing it's
-                              type: removeCountFromString(SBItemName),
-                              node: dataFilter[SBSectionName][SBItemName],
-                            })
-                          }
-                          color={nodeColors[SBSectionName]}
-                          itemName={SBItemName}
-                          //convert error to boolean
-                          error={!!dataFilter[SBSectionName][SBItemName].error}
-                          display_name={
-                            dataFilter[SBSectionName][SBItemName].display_name
-                          }
-                          official={
-                            dataFilter[SBSectionName][SBItemName].official ===
-                            false
-                              ? false
-                              : true
-                          }
-                        />
-                      </ShadTooltip>
-                    ))}
-                </div>
-              </DisclosureComponent>
+              <SidebarCategoryComponent
+                key={`DisclosureComponent${index + search + JSON.stringify(getFilterEdge)}`}
+                search={search}
+                getFilterEdge={getFilterEdge}
+                category={dataFilter[SBSectionName]}
+                name={SBSectionName}
+                onDragStart={onDragStart}
+              />
             ) : (
               <div key={index}></div>
-            )
+            ),
           )}
+        {(ENABLE_INTEGRATIONS || featureFlags?.mvp_components) && (
+          <ParentDisclosureComponent
+            defaultOpen={true}
+            key={`${search.length !== 0}-${getFilterEdge.length !== 0}-Bundle`}
+            button={{
+              title: "Integrations",
+              Icon: nodeIconsLucide.unknown,
+            }}
+            testId="bundle-extended-disclosure"
+          >
+            {Object.keys(dataFilter)
+              .sort(sortKeys)
+              .filter((x) => BUNDLES_SIDEBAR_FOLDER_NAMES.includes(x))
+              .map((SBSectionName: keyof APIObjectType, index) =>
+                Object.keys(dataFilter[SBSectionName]).length > 0 ? (
+                  <SidebarCategoryComponent
+                    key={`DisclosureComponent${index + search + JSON.stringify(getFilterEdge)}`}
+                    search={search}
+                    getFilterEdge={getFilterEdge}
+                    category={dataFilter[SBSectionName]}
+                    name={SBSectionName}
+                    onDragStart={onDragStart}
+                  />
+                ) : (
+                  <div key={index}></div>
+                ),
+              )}
+          </ParentDisclosureComponent>
+        )}
+        <ParentDisclosureComponent
+          defaultOpen={search.length !== 0 || getFilterEdge.length !== 0}
+          key={`${search.length !== 0}-${getFilterEdge.length !== 0}-Advanced`}
+          button={{
+            title: "Experimental",
+            Icon: nodeIconsLucide.unknown,
+            beta: true,
+          }}
+          testId="extended-disclosure"
+        >
+          {Object.keys(dataFilter)
+            .sort(sortKeys)
+            .filter(
+              (x) =>
+                !PRIORITY_SIDEBAR_ORDER.includes(x) &&
+                !BUNDLES_SIDEBAR_FOLDER_NAMES.includes(x),
+            )
+            .map((SBSectionName: keyof APIObjectType, index) =>
+              Object.keys(dataFilter[SBSectionName]).length > 0 ? (
+                <SidebarCategoryComponent
+                  key={`DisclosureComponent${index + search + JSON.stringify(getFilterEdge)}`}
+                  search={search}
+                  getFilterEdge={getFilterEdge}
+                  category={dataFilter[SBSectionName]}
+                  name={SBSectionName}
+                  onDragStart={onDragStart}
+                />
+              ) : (
+                <div key={index}></div>
+              ),
+            )}
+          {hasStore && (
+            <a
+              target={"_blank"}
+              href="https://langflow.store"
+              className="components-disclosure-arrangement"
+              draggable="false"
+            >
+              <div className="flex gap-4">
+                {/* BUG ON THIS ICON */}
+                <IconComponent
+                  name="Sparkles"
+                  strokeWidth={1.5}
+                  className="w-[22px] text-primary"
+                />
+
+                <span className="components-disclosure-title">
+                  Discover More
+                </span>
+              </div>
+              <div className="components-disclosure-div">
+                <div>
+                  <IconComponent
+                    name="Link"
+                    className="h-4 w-4 text-foreground"
+                  />
+                </div>
+              </div>
+            </a>
+          )}
+        </ParentDisclosureComponent>
       </div>
     </div>
   );

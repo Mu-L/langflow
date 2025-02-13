@@ -1,48 +1,35 @@
-import { Edge, Node, Viewport, XYPosition } from "reactflow";
 import { FlowType } from "../../flow";
 
 export type FlowsManagerStoreType = {
-  flows: Array<FlowType>;
+  autoSaving: boolean;
+  setAutoSaving: (autoSaving: boolean) => void;
+  getFlowById: (id: string) => FlowType | undefined;
+  flows: Array<FlowType> | undefined;
   setFlows: (flows: FlowType[]) => void;
   currentFlow: FlowType | undefined;
   currentFlowId: string;
-  setCurrentFlowId: (currentFlowId: string) => void;
+  saveLoading: boolean;
+  setSaveLoading: (saveLoading: boolean) => void;
   isLoading: boolean;
   setIsLoading: (isLoading: boolean) => void;
-  refreshFlows: () => Promise<void>;
-  saveFlow: (flow: FlowType, silent?: boolean) => Promise<void>;
-  autoSaveCurrentFlow: (
-    nodes: Node[],
-    edges: Edge[],
-    viewport: Viewport
-  ) => void;
-  uploadFlows: () => Promise<void>;
-  uploadFlow: ({
-    newProject,
-    file,
-    isComponent,
-    position,
-  }: {
-    newProject: boolean;
-    file?: File;
-    isComponent?: boolean;
-    position?: XYPosition;
-  }) => Promise<string | never>;
-  addFlow: (
-    newProject: boolean,
-    flow?: FlowType,
-    override?: boolean,
-    position?: XYPosition
-  ) => Promise<string | undefined>;
-  deleteComponent: (key: string) => Promise<void>;
-  removeFlow: (id: string) => Promise<void>;
-  saveComponent: (
-    component: any,
-    override: boolean
-  ) => Promise<string | undefined>;
   undo: () => void;
   redo: () => void;
   takeSnapshot: () => void;
+  examples: Array<FlowType>;
+  setExamples: (examples: FlowType[]) => void;
+  setCurrentFlow: (flow?: FlowType) => void;
+  setSearchFlowsComponents: (search: string) => void;
+  searchFlowsComponents: string;
+  selectedFlowsComponentsCards: string[];
+  setSelectedFlowsComponentsCards: (selected: string[]) => void;
+  autoSavingInterval: number;
+  setAutoSavingInterval: (autoSavingInterval: number) => void;
+  healthCheckMaxRetries: number;
+  setHealthCheckMaxRetries: (healthCheckMaxRetries: number) => void;
+  flowToCanvas: FlowType | null;
+  setFlowToCanvas: (flowToCanvas: FlowType | null) => Promise<void>;
+  IOModalOpen: boolean;
+  setIOModalOpen: (IOModalOpen: boolean) => void;
 };
 
 export type UseUndoRedoOptions = {
